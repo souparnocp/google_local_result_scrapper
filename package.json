@@ -14,10 +14,11 @@
   "dependencies": {
     "cheerio": "^1.0.0-rc.3",
     "json2csv": "^5.0.7",
-    "minimist": "^1.2.6",
     "puppeteer": "^1.20.0",
     "xmldom": "^0.6.0",
-    "xpath": "^0.0.32"
+    "xpath": "^0.0.32",
+    "chromedriver": "^102.0.0",
+    "selenium-webdriver": "^4.2.0"
   },
   "keywords": [
     "Google",

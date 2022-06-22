@@ -1,13 +1,17 @@
 const cheerio = require('cheerio');
 const fs = require('fs');
 const { parse } = require('json2csv');
+const webdriver = require('selenium-webdriver');
+const chrome =require( 'selenium-webdriver/chrome');
+const chromedriver =require( 'chromedriver');
+const {Builder, By} = require('selenium-webdriver');
+
 
 class GoogleLocalResultScrapper {
 
     constructor() {
         this.records = [];
-	this.allResults = [];
-        this.resultPage = 1;
+        this.result = 1;
     }
 
     /**
@@ -19,7 +23,9 @@ class GoogleLocalResultScrapper {
         const puppeteer = require('puppeteer');
 
         const PUPPETEER_OPTIONS = {
-            headless,
+            headless:false,
+            devtools:false,
+            //executablePath: '/Users/mridulshukla/Downloads/geckodrier',
             args: ['--no-sandbox', '--disable-setuid-sandbox'],
         };
         this.browser = await puppeteer.launch(PUPPETEER_OPTIONS);
@@ -27,9 +33,9 @@ class GoogleLocalResultScrapper {
         // opens new browser window
         this.page = await this.browser.newPage();
 
-        const BROWSER_EXTRA_HEADERS = {'Accept-Language': 'en-NG,en-GB;q=0.9,en;q=0.8'};
+        const BROWSER_EXTRA_HEADERS = { 'Accept-Language': 'en-NG,en-GB;q=0.9,en;q=0.8' };
         const BROWSER_USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36';
-        const BROWSER_VIEW_PORT = {width: 1500, height: 764};
+        const BROWSER_VIEW_PORT = { width: 1500, height: 764 };
 
         await this.page.setExtraHTTPHeaders(BROWSER_EXTRA_HEADERS);
         await this.page.setUserAgent(BROWSER_USER_AGENT);
@@ -45,8 +51,8 @@ class GoogleLocalResultScrapper {
     async visitGoogle(searchQuery, resultPageLimit = 0) {
         try {
 
-            const PAGE_URL = 'https://www.google.com';
-            const PAGE_OPTIONS = {timeout: 100000};
+            const PAGE_URL = 'http://maps.google.com';
+            const PAGE_OPTIONS = { timeout: 100000 };
 
             // Goto google.com
             await this.page.goto(PAGE_URL, PAGE_OPTIONS);
@@ -69,21 +75,23 @@ class GoogleLocalResultScrapper {
             // Wait for random amount of time :)
             await this.page.waitFor(1250 + Math.floor(Math.random() * 250));
 
-	    // Click the More places link
-	    const elements = await this.page.$x("//*[@id='main']/div[4]/div/div[10]/a")
-	    await elements[0].click() 
+            // Click the More places link
+            const elements = await this.page.$x("//*[@id='searchbox-searchbutton']")
+           
+            await elements[0].click()
 
-	    // wait till page finish loading
-	    await this.page.waitForNavigation();
+            // wait till page finish loading
+            await this.page.waitForNavigation();
 
-	    // wait for random amount of time
-	    await this.page.waitFor(1250 + Math.floor(Math.random() * 250));
+            // wait for random amount of time
+            await this.page.waitFor(1250 + Math.floor(Math.random() * 250));
 
-	    // Get the page content in raw html, so we can access it with the jquery guy $
-	    const pageContent = await this.page.content();
+            // Get the page content in raw html, so we can access it with the jquery guy $
+            const pageContent = await this.page.content();
 
-	    // proceed to the next method to read or data from the DOM and write it to a file
-	    return await this._readData(pageContent, resultPageLimit);
+            // proceed to the next method to read or data from the DOM and write it to a file
+            //console.log(pageContent,"pageContent")
+            return await this._readData(pageContent, resultPageLimit);
 
         } catch (error) {
             throw error;
@@ -98,77 +106,70 @@ class GoogleLocalResultScrapper {
      * @private
      */
 
-    async _readData(pageContent, resultPageLimit) {
-	let $ = cheerio.load(pageContent);
+    async __readData(pageContent, resultPageLimit) {
         // Parse the page content with cheerio
+        const $ = cheerio.load(pageContent);
+        const allResults = [];
+        console.log(pageContent,"--")
+        $('div#main').find('div.X7NTVe').find('div > a.tHmfQe').each(function (index, element) {
 
-	let allResults = this.allResults;
+            allResults.push("https://www.google.com/maps/search" + $(element).attr('href'));
+        });
 
-	$('div#main').find('div.X7NTVe').find('div > a.tHmfQe').each(function (index, element) {
+        for (let i = 0; i < allResults.length; i++) {
+            const PAGE_URL = allResults[i];
+            const PAGE_OPTIONS = { timeout: 100000 };
 
-  		allResults.push("https://www.google.com"+$(element).attr('href'));
-	});
+            // goto the respected url
+            await this.page.goto(PAGE_URL, PAGE_OPTIONS);
+
+            // Wait for at least 1.5secs for the result modal to load
+            await this.page.waitFor(1500 + Math.floor(Math.random() * 250));
 
 
 
-	let nextButton = null;
-
-	// Get the next button
-	if (this.resultPage == 1){
-		nextButton = await this.page.$x("//*[@id='main']/footer/div[1]/div/div/a");
-	} else {
-		nextButton = await this.page.$x("//*[@id='main']/footer/div[1]/div/div/a[2]");
-	}
-
-	// Check the if the button exists i.e we are not on the last page of the result
-	if (nextButton) {
-	    // If the set result limit not equal result page continue scrapping
-	    if (resultPageLimit && (resultPageLimit !== this.resultPage)) {
-		
-	    	// wait for random amount of time
-	    	await this.page.waitFor(1250 + Math.floor(Math.random() * 250));
-
-		// If it does, click the next button
-	        await nextButton[0].click();
-
-	    	// wait till page finish loading
-	    	await this.page.waitForNavigation();
-
-		this.resultPage += 1;
-
-	    	// wait for random amount of time
-	    	await this.page.waitFor(1250 + Math.floor(Math.random() * 250));
-
-	    	// Get the page content in raw html, so we can access it with the jquery guy $
-	    	const pageContent = await this.page.content();
-
-		// Re-run the process all over again
-		await this._readData(pageContent, resultPageLimit)
-	    }
-	}
-
-	console.log(this.allResults.length);
-        this._scrap_results(this.allResults);	
-	return this.records;
+        }
     }
 
-    async _scrap_results(allResults){
-	 //Loop through all results, and format the data.
-	for (let i = 0; i < allResults.length; i++) {
-		const PAGE_URL = allResults[i];
-		const PAGE_OPTIONS = {timeout: 100000};
+    async _readData(pageContent, resultPageLimit) {
+        let $ = cheerio.load(pageContent);
+        // Parse the page content with cheerio
+        const allResults = [];
+        
+         
+        await $('a.hfpxzc').each(function (index, element) {
+            allResults.push($(element).attr('href'))
+        })
+            
+        
+        console.log(allResults,"all")
 
-		// goto the respected url
-		await this.page.goto(PAGE_URL, PAGE_OPTIONS);
+        // Loop through all results, and format the data.
+        for (let i = 0; i < allResults.length; i++) {
+            const PAGE_URL = allResults[i];
+            const PAGE_OPTIONS = { timeout: 100000 };
 
-		// Wait for at least 1.5secs for the result modal to load
-		await this.page.waitFor(1500 + Math.floor(Math.random() * 250));
+            // goto the respected url
+            await this.page.goto(PAGE_URL, PAGE_OPTIONS);
 
-		const updatedPagedContent = await this.page.content();
+            // Wait for at least 1.5secs for the result modal to load
+            await this.page.waitFor(1500 + Math.floor(Math.random() * 250));
 
-		let $ = cheerio.load(updatedPagedContent);
+            const updatedPagedContent = await this.page.content();
 
-		const name = $('div#main').find('div:nth-of-type(4) > div > div:nth-of-type(1) > span:nth-of-type(1) > h3 > div').text();
+            let $ = cheerio.load(updatedPagedContent);
+            // $('div.rogA2c').each(function(index,element) {
+            //     let item=$(element).text
+            //     if(item){
+            //     if(item.match('/^(\([0-9]{3}\) |[0-9]{3}-)[0-9]{3}-[0-9]{4}/')){
+            //         phone=item
+            //     }
+            //     else if(item.match('@^(http\:\/\/|https\:\/\/)?([a-z0-9][a-z0-9\-]*\.)+[a-z0-9][a-z0-9\-]*$@i')){
+            //       website=item
+            //     }
+            // }
+            // })
+            const name = $('div#main').find('div:nth-of-type(4) > div > div:nth-of-type(1) > span:nth-of-type(1) > h3 > div').text();
 
 
 		//// Get the record category, could be high record driving record e.t.c
@@ -180,16 +181,41 @@ class GoogleLocalResultScrapper {
 
 
 		// Get the phone number
-		const phone_number = $('div#main').find('div:nth-of-type(4) > div > div:nth-of-type(4) >  div:nth-of-type(3) > div> span:nth-of-type(2) > span').text();
+		const phone_number = $("#QA0Szd > div > div > div.w6VYqd > div.bJzME.tTVLSc > div > div.e07Vkf.kA9KIf > div > div > div:nth-child(7) > div:nth-child(7) > button > div.AeaXub > div.rogA2c > div.Io6YTe.fontBodyMedium").text();
 
 		// Get the records website
 		const website = $('div#main').find('div:nth-of-type(4) > div > div:nth-of-type(3) > div> a:nth-of-type(2)').attr('href') || '';
 
-		//// Add the record to the array of records for the current local government area
-		const record = {name, phone_number, location, website};
-		this.records.push(record);
 
-	    }
+            //// Add the record to the array of records for the current local government area
+            const record = { name, phone_number, location, website };
+            console.log(record)
+            this.records.push(record);
+
+        }
+
+
+        //// Get the next button
+        //const nextButton = await this.page.$('a[id="pnnext"]');
+
+        //// Check the if the button exists i.e we are not on the last page of the result
+        //if (nextButton) {
+
+        //// If the set result limit not equal result page continue scrapping
+        //if (resultPageLimit && (resultPageLimit !== this.resultPage)) {
+        //// If it does, click the next button
+        //await nextButton.click();
+
+        //// But for now wait for 2.5second for the next page result to load
+        //await this.page.waitFor(1500);
+        //this.resultPage += 1;
+
+        //// Re-run the process all over again
+        //await this._readData(await this.page.content(), resultPageLimit)
+        //}
+        //}
+
+        return this.records;
     }
 
     /**
@@ -198,7 +224,39 @@ class GoogleLocalResultScrapper {
      * @param {String} file_name The name of the file
      * @return {Promise<String>} The file name
      */
-    async saveAsJson({records, file_name}) {
+     async filterRes(records) {
+        records=records.records
+        chrome.setDefaultService(new chrome.ServiceBuilder(chromedriver.path).build());
+        
+        const driver =  new webdriver.Builder()
+        .forBrowser('chrome')
+        .build();
+        let data = []
+        await driver.get("https://web.whatsapp.com")
+        data = []
+        for (let i = 0; i < records.length; i++) {
+            
+            if(records[i]['phone_number'].length>0){
+                console.log(records[i],"records[i]")
+            let phone = records[i]['phone_number'].replace(" ", "").replace("+", "")
+            await driver.get("https://web.whatsapp.com/send?phone=$" + phone+ "&text&app_absent=0")
+
+            if (driver.findElement(By.xpath("/html/body/div[1]/div[1]/span[2]/div[1]/span/div[1]/div/div/div")) == 0) {
+
+
+                data.push([records[i]['name'], records[i]['location'], records[i]['phone_number'], records[i]['website']])
+            }
+            else {
+
+                data.push([records[i]['name'], records[i]['location'], '', records[i]['website']])
+            }
+        }
+        return data
+    
+        }
+    }
+	
+    async saveAsJson({ records, file_name }) {
         return new Promise((resolve, reject) => {
             // convert file name to lowercase and replace all white space with underscore
             const newFileName = file_name.toLowerCase()
@@ -215,28 +273,28 @@ class GoogleLocalResultScrapper {
     }
 
 
-	
-    async saveAsCSV({records, file_name}) {
+
+    async saveAsCSV({ records, file_name }) {
         return new Promise((resolve, reject) => {
             // convert file name to lowercase and replace all white space with underscore
             const newFileName = file_name.toLowerCase()
                 .replace(/ /ig, "_");
 
-	    const fields = ['name', 'phone_number', 'location', 'website'];
-	    const opts = { fields };
+            const fields = ['name', 'phone_number', 'location', 'website'];
+            const opts = { fields };
 
             try {
-              const csv = parse(records, opts);
+                const csv = parse(records, opts);
 
-            fs.writeFile(`${newFileName}.csv`, csv, 'utf8', (error) => {
-                if (error) {
-                    reject(error);
-                } else {
-                    resolve(`${newFileName}.json`);
-                }
-            });
+                fs.writeFile(`${newFileName}.csv`, csv, 'utf8', (error) => {
+                    if (error) {
+                        reject(error);
+                    } else {
+                        resolve(`${newFileName}.json`);
+                    }
+                });
             } catch (err) {
-                    reject(error);
+                reject(error);
             }
 
         })
@@ -287,7 +345,7 @@ class GoogleLocalResultScrapper {
     }
 
     async closeBrowser() {
-	await this.browser.close();
+        await this.browser.close();
     }
 
 }

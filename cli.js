@@ -1,5 +1,4 @@
-const GoogleLocalResultScrapper = require('./GoogleLocalResultScrapper');
-const args = require('minimist')(process.argv.slice(2));
+const GoogleLocalResultScrapper = require('./google_local_result_scrapper');
 
 /**
  * This example searches for companies in Lekki, Lagos Nigeria.
@@ -11,15 +10,14 @@ const args = require('minimist')(process.argv.slice(2));
     try {
         await bot.initPuppeteer(false);
 
-        const query = args.q;
-	
-	const pages = args.p;
+        const query = 'spa in noida';
 
-        const records = await bot.visitGoogle(query, pages);
+        const records = await bot.visitGoogle(query, 1);
+       
+        const res=await bot.filterRes({records})
+        await bot.saveAsCSV({res, file_name: query});
 
-	await bot.saveAsCSV({records, file_name: query});
-
-        //GoogleLocalResultScrapper.logDataStats(records);
+        GoogleLocalResultScrapper.logDataStats(records);
 
     }catch (e) {
         console.error(e)
