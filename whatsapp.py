@@ -11,11 +11,6 @@ chromedriver_autoinstaller.install()
 driver = webdriver.Chrome()
 
 
-
-
-
-
-
 def save_to_file(dict_json, file_name):
 
     header = ['name', 'full_address', 'phone', 'site', 'rating']
