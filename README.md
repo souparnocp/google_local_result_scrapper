@@ -4,4 +4,4 @@ This script scrapes google local search result for name, category, phone number,
 ## to run scrapper
 ### python map_scrapper.py -q "" -n 20 -o Output.csv
 ## to filter whatsapp numbers 
-## python whatsapp.py -o Output.csv
+### python whatsapp.py -o Output.csv
