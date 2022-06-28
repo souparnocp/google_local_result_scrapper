@@ -1,7 +1,12 @@
+#!/usr/bin/env python3
+
 import json
 import csv
 import argparse
 from outscraper import ApiClient
+
+import time
+
 
 API_KEY = 'Z29vZ2xlLW9hdXRoMnwxMTc0MDk1OTAxOTcxMjgxNjQ1ODN8NjJhMGFhMWJkMg'
 
@@ -26,11 +31,12 @@ def save_to_file(dict_json, file_name):
     header = ['name', 'full_address', 'phone', 'site', 'rating']
 
     data = []
-
+   
     for dict in dict_json:
+        
         data.append([dict['name'], dict['full_address'], dict['phone'], dict['site'], dict['rating']])
-
-
+      
+    
     with open(file_name, 'w', encoding='UTF8', newline='') as f:
         writer = csv.writer(f)
 
@@ -60,6 +66,5 @@ def main():
 
 if __name__ == '__main__':
     main()
-
 
 
